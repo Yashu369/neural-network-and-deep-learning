@@ -1,0 +1,58 @@
+import cv2
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications.imagenet_utils import decode_predictions
+
+# Load the pre-trained MobileNetV2 model with ImageNet weights
+model = MobileNetV2(weights='imagenet')
+
+# Function to preprocess the image
+def preprocess_image(image_path):
+    # Load the image using OpenCV
+    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError("Image not found or unable to load.")
+    
+    # Resize to 224x224 (MobileNetV2 input size)
+    img = cv2.resize(img, (224, 224))
+    
+    # Convert BGR to RGB (OpenCV loads in BGR)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    
+    # Preprocess for MobileNetV2 (includes normalization)
+    img = tf.keras.applications.mobilenet_v2.preprocess_input(img)
+    
+    # Expand dimensions to match model input (batch size 1)
+    img = np.expand_dims(img, axis=0)
+    
+    return img
+
+# Function to predict the animal
+def predict_animal(image_path):
+    # Preprocess the image
+    processed_img = preprocess_image(image_path)
+    
+    # Make prediction
+    predictions = model.predict(processed_img)
+    
+    # Decode predictions to get class labels
+    decoded_predictions = decode_predictions(predictions, top=1)[0]  # Top 1 prediction
+    
+    # Extract the predicted class and confidence
+    predicted_class = decoded_predictions[0][1]  # Class name
+    confidence = decoded_predictions[0][2]  # Confidence score
+    
+    return predicted_class, confidence
+
+# Main execution
+if __name__ == "__main__":
+    # Prompt user for image path
+    image_path = input("Enter the path to the animal image: ")
+    
+    try:
+        # Predict and print the result
+        animal, confidence = predict_animal(image_path)
+        print(f"Predicted animal: {animal} (Confidence: {confidence:.2f})")
+    except Exception as e:
+        print(f"Error: {e}")
