@@ -21,7 +21,7 @@ def preprocess_image(image_path):
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     
     # Preprocess for MobileNetV2 (includes normalization)
-    img = tf.keras.applications.mobilenet_v2.preprocess_input(img)
+    img = tf.keras.applications.mobilenet_v2.preprocess_input(img) #scales pixel values to the range
     
     # Expand dimensions to match model input (batch size 1)
     img = np.expand_dims(img, axis=0)
