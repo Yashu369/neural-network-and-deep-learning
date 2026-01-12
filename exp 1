@@ -1,1 +1,172 @@
+# ==========================================================
+# CREDIT CARD FRAUD DETECTION USING ML + DL
+# Includes:
+# - Loss Function
+# - Threshold-based prediction
+# - Confusion Matrices
+# - Loss Curve
+# - Precision–Recall–F1 vs Threshold Plot
+# ==========================================================
+
+# -----------------------------
+# 1. IMPORT LIBRARIES
+# -----------------------------
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import precision_recall_curve
+
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+
+# -----------------------------
+# 2. LOAD DATASET
+# -----------------------------
+data = pd.read_csv("creditcard.csv")
+
+print("Dataset Shape:", data.shape)
+print(data.head())
+
+# -----------------------------
+# 3. DATA PREPROCESSING
+# -----------------------------
+X = data.drop("Class", axis=1)
+y = data["Class"]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+# -----------------------------
+# 4. MACHINE LEARNING MODEL
+# -----------------------------
+lr_model = LogisticRegression(max_iter=1000)
+lr_model.fit(X_train, y_train)
+
+y_pred_lr = lr_model.predict(X_test)
+
+print("\n--- Logistic Regression Report ---")
+print(classification_report(y_test, y_pred_lr))
+
+cm_lr = confusion_matrix(y_test, y_pred_lr)
+
+plt.figure(figsize=(6,4))
+sns.heatmap(cm_lr, annot=True, fmt="d", cmap="Blues")
+plt.title("Confusion Matrix - Logistic Regression")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+
+# -----------------------------
+# 5. DEEP LEARNING MODEL
+# -----------------------------
+dl_model = Sequential([
+    Dense(32, activation="relu", input_shape=(X_train.shape[1],)),
+    Dropout(0.3),
+    Dense(16, activation="relu"),
+    Dense(1, activation="sigmoid")
+])
+
+# -----------------------------
+# 6. COMPILE MODEL (LOSS FUNCTION)
+# -----------------------------
+dl_model.compile(
+    optimizer="adam",
+    loss="binary_crossentropy",   # LOSS FUNCTION
+    metrics=["accuracy"]
+)
+
+# -----------------------------
+# 7. TRAIN MODEL
+# -----------------------------
+history = dl_model.fit(
+    X_train, y_train,
+    epochs=20,
+    batch_size=256,
+    validation_split=0.2,
+    verbose=1
+)
+
+# -----------------------------
+# 8. LOSS CURVE
+# -----------------------------
+history_df = pd.DataFrame(history.history)
+
+plt.figure(figsize=(8,5))
+sns.lineplot(data=history_df["loss"], label="Training Loss")
+sns.lineplot(data=history_df["val_loss"], label="Validation Loss")
+plt.title("Loss Curve - Deep Learning Model")
+plt.xlabel("Epochs")
+plt.ylabel("Loss")
+plt.legend()
+plt.show()
+
+# -----------------------------
+# 9. THRESHOLD-BASED PREDICTION
+# -----------------------------
+threshold = 0.3  # Recall-focused threshold
+
+y_pred_prob = dl_model.predict(X_test).ravel()
+y_pred_dl = (y_pred_prob > threshold).astype(int)
+
+print("\n--- Deep Learning Report (Threshold = 0.3) ---")
+print(classification_report(y_test, y_pred_dl))
+
+cm_dl = confusion_matrix(y_test, y_pred_dl)
+
+plt.figure(figsize=(6,4))
+sns.heatmap(cm_dl, annot=True, fmt="d", cmap="Reds")
+plt.title("Confusion Matrix - Deep Learning")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+
+# ==========================================================
+# 10. PRECISION – RECALL – F1 vs THRESHOLD
+# ==========================================================
+
+# Calculate precision, recall, thresholds
+precision, recall, thresholds = precision_recall_curve(y_test, y_pred_prob)
+
+# Calculate F1-score for each threshold
+f1_scores = []
+for p, r in zip(precision, recall):
+    if (p + r) == 0:
+        f1_scores.append(0.0)
+    else:
+        f1_scores.append(2 * (p * r) / (p + r))
+
+# Create DataFrame
+threshold_df = pd.DataFrame({
+    "threshold": thresholds,
+    "precision": precision[:-1],
+    "recall": recall[:-1],
+    "f1_score": f1_scores[:-1]
+})
+
+# Plot Precision, Recall, F1 vs Threshold
+plt.figure(figsize=(10,6))
+sns.lineplot(x="threshold", y="precision", data=threshold_df, label="Precision")
+sns.lineplot(x="threshold", y="recall", data=threshold_df, label="Recall")
+sns.lineplot(x="threshold", y="f1_score", data=threshold_df, label="F1-Score")
+
+plt.title("Precision, Recall, and F1-Score vs Threshold")
+plt.xlabel("Threshold")
+plt.ylabel("Score")
+plt.grid(True)
+plt.legend()
+plt.show()
 
