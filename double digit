@@ -1,69 +1,94 @@
 import tensorflow as tf
 from tensorflow.keras import layers, models
-import cv2 #for user input to load and process external images
-import numpy as np #numerical processing
+import matplotlib.pyplot as plt
+import cv2
+import numpy as np
 
-# ----------------------------------------------------
-# 1. Load MNIST Handwritten Digit Dataset
-# ----------------------------------------------------
+# ----------------------------------------------------------
+# 1. Load MNIST dataset
+# ----------------------------------------------------------
 (x_train, y_train), (x_test, y_test) = tf.keras.datasets.mnist.load_data()
 
-# Normalize pixel values (0–255) → (0–1)
+# ----------------------------------------------------------
+# 2. Combine two digits into a double digit (00–99)
+#    Example: if MNIST gives [3, 7], we map to label "37"
+# ----------------------------------------------------------
+def make_double_digit_labels(images, labels):
+    new_images = []
+    new_labels = []
+
+    for i in range(0, len(images) - 1, 2):
+        left = images[i]
+        right = images[i+1]
+
+        # Combine into side-by-side 28×56 image
+        combined = np.hstack((left, right))
+        new_images.append(combined)
+
+        double_label = labels[i] * 10 + labels[i+1]  # e.g., 3 & 7 → 37
+        new_labels.append(double_label)
+
+    return np.array(new_images), np.array(new_labels)
+
+x_train, y_train = make_double_digit_labels(x_train, y_train)
+x_test, y_test   = make_double_digit_labels(x_test,  y_test)
+
+# Normalize
 x_train = x_train / 255.0
 x_test = x_test / 255.0
 
-# ----------------------------------------------------
-# 2. Build Neural Network Model
-# ----------------------------------------------------
+# ----------------------------------------------------------
+# 3. Build model — output layer = 100 classes
+# ----------------------------------------------------------
 model = models.Sequential([
-    layers.Flatten(input_shape=(28, 28)),    # Convert image to 1D
-    layers.Dense(128, activation='relu'),     # Hidden layer
-    layers.Dense(10, activation='softmax')    # 10 digits output
+    layers.Flatten(input_shape=(28, 56)),
+    layers.Dense(256, activation='relu'),
+    layers.Dense(100, activation='softmax')  # <-- 00–99
 ])
 
-# ----------------------------------------------------
-# 3. Compile Model
-# ----------------------------------------------------
-model.compile(
-    optimizer='adam',
-    loss='sparse_categorical_crossentropy',
-    metrics=['accuracy']
-)
+# ----------------------------------------------------------
+# 4. Compile
+# ----------------------------------------------------------
+model.compile(optimizer='adam',
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
 
-# ----------------------------------------------------
-# 4. Train Model
-# ----------------------------------------------------
-model.fit(x_train, y_train, epochs=5)
+# ----------------------------------------------------------
+# 5. Train
+# ----------------------------------------------------------
+model.fit(x_train, y_train, epochs=5, batch_size=32)
 
-# ----------------------------------------------------
-# 5. Test Accuracy
-# ----------------------------------------------------
+# ----------------------------------------------------------
+# 6. Evaluate
+# ----------------------------------------------------------
 test_loss, test_acc = model.evaluate(x_test, y_test)
 print("Test Accuracy:", test_acc)
 
-def predict_digit_from_image(image_path):
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+# ----------------------------------------------------------
+# 7. USER IMAGE PREDICTION (double-digit image)
+# ----------------------------------------------------------
+# User input
+img_path = input("Enter the image path of a DOUBLE-DIGIT image (example: 27.png): ")
 
-    if img is None:
-        print(f"Error: Could not load image from {image_path}. Please ensure the file exists and is an image.")
-        return None
-    else:
-        #resize the image
-        img = cv2.resize(img, (28,28))
-        #normalize
-        img = img / 255.0
-        # Expand dimensions to match model input shape (1, 28, 28)
-        img_for_prediction = np.expand_dims(img, axis=0)
-        predictions = model.predict(img_for_prediction)
-        predicted_digit = np.argmax(predictions[0])
-        print(f"Predicted digit for {image_path}: {predicted_digit}")
-        return predicted_digit
+# Load grayscale image
+img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
-# Get two image paths from the user
-img_path1 = input("Enter the path to your first image file (e.g., digit1.png, make sure it's uploaded to Colab): ")
-img_path2 = input("Enter the path to your second image file (e.g., digit2.png, make sure it's uploaded to Colab): ")
+# Resize to match training format 28×56
+img = cv2.resize(img, (56, 28))
 
-# Make predictions for both images
-print("\n--- Predictions ---")
-predict_digit_from_image(img_path1)
-predict_digit_from_image(img_path2)
+# Normalize
+img = img / 255.0
+
+# Reshape for the model
+img_ready = img.reshape(1, 28, 56)
+
+# Predict
+prediction = model.predict(img_ready)
+predicted_number = prediction.argmax()
+
+print("Predicted Double-Digit =", predicted_number)
+
+# Display image
+plt.imshow(img, cmap='gray')
+plt.title("Predicted = " + str(predicted_number))
+plt.show()
